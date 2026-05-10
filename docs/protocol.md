@@ -239,6 +239,14 @@ Requests immediate stop. Any safety-aware client may emit it.
 }
 ```
 
+### `state.patch`
+
+Packages use `state.patch` to send simultaneous changes to shared resources.
+The coordinator serializes patches per `resource_id`, assigns revisions, and
+broadcasts `state.accepted` or returns `state.conflict`.
+
+See [concurrency.md](concurrency.md) for the full flow.
+
 ### Legacy YAM Compatibility
 
 The existing hackathon YAM control socket uses JSON-RPC-style messages:

@@ -159,6 +159,10 @@
         <h2>Tasks</h2>
         <div id="tasks" class="content list"></div>
       </section>
+      <section>
+        <h2>Shared Resources</h2>
+        <div id="resources" class="content list"></div>
+      </section>
     </div>
     <div class="stack">
       <div class="grid">
@@ -188,6 +192,7 @@
       robots: new Map(),
       leaders: new Map(),
       images: new Map(),
+      resources: new Map(),
       tasks: new Map(),
       events: []
     };
@@ -234,6 +239,11 @@
         return row(title, `<div>${kind}</div><div class="mono">${JSON.stringify(task, null, 2)}</div>`);
       }).join("") || `<span class="pill">no tasks</span>`;
 
+      $("resources").innerHTML = [...state.resources.values()].map((resource) => row(
+        resource.resource_id,
+        `<div class="kv"><div class="key">Revision</div><div>${resource.revision}</div><div class="key">Package</div><div>${resource.package_id || resource.last_package_id || ""}</div></div><div class="mono">${JSON.stringify(resource.state || {}, null, 2)}</div>`
+      )).join("") || `<span class="pill">no shared resources</span>`;
+
       $("robots").innerHTML = [...state.robots.values()].map((robot) => row(
         robot.robot_id,
         `<div class="kv"><div class="key">Space</div><div>${robot.state_space || ""}</div><div class="key">Joints</div><div class="mono">${compactArray(robot.joint_pos, 14)}</div></div>`
@@ -264,6 +274,9 @@
         state.reports.set(message.component_id || "unknown", message);
         const latest = message.details?.latest || [];
         latest.forEach(handleProtocol);
+        Object.entries(message.details?.resources || {}).forEach(([resource_id, resource]) => {
+          state.resources.set(resource_id, { resource_id, ...resource });
+        });
       } else if (message.type === "robot.state") {
         state.robots.set(message.robot_id || "unknown", message);
       } else if (message.type === "leader.state") {
@@ -272,6 +285,8 @@
         state.images.set(message.camera_id || "camera", message);
       } else if (["task.request", "task.claim", "task.result"].includes(message.type)) {
         state.tasks.set(message.id || message.task_id || `${message.type}-${Date.now()}`, message);
+      } else if (message.type === "state.accepted") {
+        state.resources.set(message.resource_id, message);
       }
       render();
     }

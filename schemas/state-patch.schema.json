@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://robot-task-ws-protocol.dev/schemas/state-patch.schema.json",
+  "title": "StatePatch",
+  "type": "object",
+  "required": [
+    "type",
+    "protocol",
+    "version",
+    "change_id",
+    "package_id",
+    "resource_id",
+    "operations"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "type": { "const": "state.patch" },
+    "protocol": { "const": "robot-task-ws" },
+    "version": { "type": "string" },
+    "change_id": { "type": "string", "minLength": 1 },
+    "package_id": { "type": "string", "minLength": 1 },
+    "resource_id": { "type": "string", "minLength": 1 },
+    "base_revision": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "causal_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["op", "path"],
+        "additionalProperties": false,
+        "properties": {
+          "op": { "enum": ["add", "replace", "remove"] },
+          "path": {
+            "type": "string",
+            "pattern": "^/"
+          },
+          "value": {}
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": { "op": { "enum": ["add", "replace"] } },
+              "required": ["op"]
+            },
+            "then": { "required": ["value"] }
+          }
+        ]
+      }
+    }
+  }
+}

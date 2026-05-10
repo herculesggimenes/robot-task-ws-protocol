@@ -43,6 +43,11 @@ The core flow is:
 
 See [docs/protocol.md](docs/protocol.md) for the full draft.
 
+For simultaneous changes from multiple packages, see
+[docs/concurrency.md](docs/concurrency.md). The short version: packages send
+`state.patch` with `package_id`, `resource_id`, and optional `base_revision`;
+the coordinator broadcasts accepted revisions or returns conflicts.
+
 ## Quick Start
 
 Install the example dependencies:
@@ -67,6 +72,12 @@ Publish a demo task:
 
 ```bash
 python examples/python/submit_task.py ws://127.0.0.1:8765
+```
+
+Try concurrent package changes:
+
+```bash
+python examples/python/package_change_demo.py ws://127.0.0.1:8765
 ```
 
 Open the status viewer:
@@ -98,8 +109,10 @@ See [docs/migration.md](docs/migration.md) for commands.
 
 - `docs/protocol.md`: human-readable protocol draft
 - `docs/migration.md`: notes for bridging the existing YAM hackathon stack
+- `docs/concurrency.md`: simultaneous change protocol for multiple packages
 - `schemas/`: JSON Schema definitions for wire messages
 - `examples/python/`: minimal reference implementation
+- `migrated/can-mac/`: migrated YAM/camera/leader code from the hackathon tree
 - `web/viewer.html`: WebSocket status viewer
 
 ## Contributing

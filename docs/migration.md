@@ -3,6 +3,10 @@
 This document maps the current YAM hackathon WebSockets into the open
 `robot-task-ws` protocol.
 
+The working YAM files have also been copied into `migrated/can-mac/` in their
+original relative layout so the open repo contains the current hardware path
+while native protocol replacements are introduced.
+
 ## Current Services
 
 ### YAM Control Socket
