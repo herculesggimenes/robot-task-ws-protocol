@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://robot-task-ws-protocol.dev/schemas/motor-command.schema.json",
+  "title": "RobotMotorCommand",
+  "type": "object",
+  "required": ["type", "protocol", "version", "id", "robot_id", "command_space"],
+  "additionalProperties": false,
+  "properties": {
+    "type": {
+      "const": "motor.command"
+    },
+    "protocol": {
+      "const": "robot-task-ws"
+    },
+    "version": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "robot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "command_space": {
+      "type": "string",
+      "minLength": 1
+    },
+    "joint_pos": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 1
+    },
+    "velocity": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "torque": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_joint_delta": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_gripper_delta": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  },
+  "anyOf": [
+    { "required": ["joint_pos"] },
+    { "required": ["velocity"] },
+    { "required": ["torque"] }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://robot-task-ws-protocol.dev/schemas/message.schema.json",
+  "title": "RobotTaskWsMessage",
+  "type": "object",
+  "required": ["type", "protocol", "version"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "hello",
+        "client.register",
+        "image.frame",
+        "robot.state",
+        "task.request",
+        "task.claim",
+        "task.result",
+        "motor.command",
+        "stop",
+        "error"
+      ]
+    },
+    "protocol": {
+      "const": "robot-task-ws"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "id": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "number"
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,21 @@
+[project]
+name = "robot-task-ws-protocol"
+version = "0.1.0"
+description = "Open WebSocket protocol for distributing robot image and motor-control tasks."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Hercules Gimenes" }]
+dependencies = [
+  "websockets>=12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "jsonschema>=4.22",
+  "ruff>=0.4.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

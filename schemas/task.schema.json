@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://robot-task-ws-protocol.dev/schemas/task.schema.json",
+  "title": "RobotTaskRequest",
+  "type": "object",
+  "required": ["type", "protocol", "version", "id", "task"],
+  "additionalProperties": false,
+  "properties": {
+    "type": {
+      "const": "task.request"
+    },
+    "protocol": {
+      "const": "robot-task-ws"
+    },
+    "version": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task": {
+      "type": "object",
+      "required": ["kind", "prompt"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1,
+          "examples": ["perception.locate_pixel", "planner.subtask", "control.move"]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inputs": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "frame_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "robot_state_id": {
+              "type": "string"
+            }
+          }
+        },
+        "constraints": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "timeout_ms": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

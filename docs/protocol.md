@@ -1,0 +1,223 @@
+# Protocol Draft v0.1
+
+## Transport
+
+The protocol runs over WebSocket. JSON text frames are required. Binary frames
+are reserved for future high-throughput image and tensor payloads.
+
+A server may expose multiple endpoints, but the default endpoint is:
+
+```text
+/ws
+```
+
+## Message Envelope
+
+Every JSON message uses this envelope:
+
+```json
+{
+  "type": "task.request",
+  "protocol": "robot-task-ws",
+  "version": "0.1.0",
+  "id": "task-001",
+  "timestamp": 1778448000.0
+}
+```
+
+## Message Types
+
+### `hello`
+
+Sent by the server immediately after connection.
+
+```json
+{
+  "type": "hello",
+  "protocol": "robot-task-ws",
+  "version": "0.1.0",
+  "server_id": "lab-coordinator-1",
+  "capabilities": ["task_queue", "image_frames", "motor_commands"]
+}
+```
+
+### `client.register`
+
+Sent by clients to describe their role.
+
+```json
+{
+  "type": "client.register",
+  "protocol": "robot-task-ws",
+  "version": "0.1.0",
+  "client_id": "planner-a",
+  "role": "planner",
+  "capabilities": ["task.plan", "task.result"]
+}
+```
+
+Common roles:
+
+- `camera`
+- `planner`
+- `perception`
+- `executor`
+- `operator`
+- `safety`
+- `monitor`
+
+### `image.frame`
+
+Publishes a camera frame. The draft uses base64 JPEG for compatibility.
+Future versions may add binary side-channel frame transfer.
+
+```json
+{
+  "type": "image.frame",
+  "protocol": "robot-task-ws",
+  "version": "0.1.0",
+  "frame_id": "front-1778448000",
+  "camera_id": "front",
+  "content_type": "image/jpeg",
+  "encoding": "base64",
+  "captured_at": 1778448000.0,
+  "data": "/9j/4AAQSkZJRgABAQAAAQABAAD..."
+}
+```
+
+### `robot.state`
+
+Publishes the current robot state.
+
+```json
+{
+  "type": "robot.state",
+  "protocol": "robot-task-ws",
+  "version": "0.1.0",
+  "robot_id": "yam-1",
+  "joint_pos": [0, 0, 0, 0, 0, 0, 0.3, 0, 0, 0, 0, 0, 0, 0.3],
+  "state_space": "yam_bimanual_14d"
+}
+```
+
+### `task.request`
+
+Creates a task to be handled by any compatible worker.
+
+```json
+{
+  "type": "task.request",
+  "protocol": "robot-task-ws",
+  "version": "0.1.0",
+  "id": "task-001",
+  "task": {
+    "kind": "perception.locate_pixel",
+    "prompt": "Find the cup and the right gripper.",
+    "inputs": {
+      "frame_ids": ["front-1778448000"]
+    },
+    "constraints": {
+      "timeout_ms": 3000
+    }
+  }
+}
+```
+
+### `task.claim`
+
+Claims a task for a worker.
+
+```json
+{
+  "type": "task.claim",
+  "protocol": "robot-task-ws",
+  "version": "0.1.0",
+  "task_id": "task-001",
+  "client_id": "perception-worker-a"
+}
+```
+
+### `task.result`
+
+Returns a task result.
+
+```json
+{
+  "type": "task.result",
+  "protocol": "robot-task-ws",
+  "version": "0.1.0",
+  "task_id": "task-001",
+  "client_id": "perception-worker-a",
+  "ok": true,
+  "result": {
+    "target_u": 328,
+    "target_v": 214,
+    "gripper_u": 402,
+    "gripper_v": 241,
+    "confidence": 0.82
+  }
+}
+```
+
+### `motor.command`
+
+Requests robot motion. Motor commands should be accepted only by authenticated
+executor clients in real deployments.
+
+```json
+{
+  "type": "motor.command",
+  "protocol": "robot-task-ws",
+  "version": "0.1.0",
+  "id": "cmd-001",
+  "robot_id": "yam-1",
+  "command_space": "yam_bimanual_14d_absolute",
+  "joint_pos": [0, 0, 0, 0, 0, 0, 0.3, 0, 0, 0, 0, 0, 0, 0.3],
+  "limits": {
+    "max_joint_delta": 0.05,
+    "max_gripper_delta": 0.02
+  }
+}
+```
+
+### `stop`
+
+Requests immediate stop. Any safety-aware client may emit it.
+
+```json
+{
+  "type": "stop",
+  "protocol": "robot-task-ws",
+  "version": "0.1.0",
+  "reason": "operator_requested"
+}
+```
+
+### `error`
+
+Reports an error.
+
+```json
+{
+  "type": "error",
+  "protocol": "robot-task-ws",
+  "version": "0.1.0",
+  "id": "task-001",
+  "error": {
+    "code": "invalid_payload",
+    "message": "missing task.kind"
+  }
+}
+```
+
+## Safety Notes
+
+The protocol separates task distribution from physical execution, but the wire
+format can still carry motor commands. Production deployments should add:
+
+- authentication
+- authorization by role
+- command bounds checking
+- rate limits
+- deadman / heartbeat behavior
+- physical emergency stop outside this protocol
