@@ -4,13 +4,16 @@ version = "0.1.0"
 description = "Open WebSocket protocol for distributing robot image and motor-control tasks."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
 authors = [{ name = "Hercules Gimenes" }]
 dependencies = [
   "websockets>=12.0",
 ]
 
 [project.optional-dependencies]
+yam = [
+  "numpy>=1.24",
+]
 dev = [
   "jsonschema>=4.22",
   "ruff>=0.4.0",
@@ -19,3 +22,7 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.setuptools]
+packages = []
+py-modules = []

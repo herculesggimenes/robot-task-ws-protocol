@@ -12,6 +12,8 @@
         "client.register",
         "image.frame",
         "robot.state",
+        "leader.state",
+        "status.report",
         "task.request",
         "task.claim",
         "task.result",

@@ -38,7 +38,8 @@ The core flow is:
 3. A coordinator publishes task requests.
 4. Workers claim tasks and submit task results.
 5. Executors apply validated motor commands.
-6. Safety clients can issue `stop` at any time.
+6. Leader arms publish `leader.state` while teleop is active.
+7. Safety clients can issue `stop` at any time.
 
 See [docs/protocol.md](docs/protocol.md) for the full draft.
 
@@ -68,11 +69,38 @@ Publish a demo task:
 python examples/python/submit_task.py ws://127.0.0.1:8765
 ```
 
+Open the status viewer:
+
+```bash
+python examples/python/viewer_server.py
+```
+
+Then open <http://127.0.0.1:8080>. The viewer can watch the protocol
+coordinator and, during migration, can also connect directly to the legacy YAM
+control and camera WebSockets.
+
+## Migrating the Hackathon Stack
+
+The repo includes compatibility adapters for the current hackathon services:
+
+- `examples/python/legacy_yam_control_adapter.py` bridges the old YAM
+  JSON-RPC control socket into `robot.state`, `status.report`, and
+  `motor.command` forwarding.
+- `examples/python/legacy_camera_adapter.py` bridges the old multi-camera socket
+  into protocol-native `image.frame` messages.
+- `examples/python/so_leader_protocol_bridge.py` publishes SO-100/SO-101 leader
+  arm status as `leader.state` and can optionally emit bounded
+  `motor.command` messages.
+
+See [docs/migration.md](docs/migration.md) for commands.
+
 ## Repository Layout
 
 - `docs/protocol.md`: human-readable protocol draft
+- `docs/migration.md`: notes for bridging the existing YAM hackathon stack
 - `schemas/`: JSON Schema definitions for wire messages
 - `examples/python/`: minimal reference implementation
+- `web/viewer.html`: WebSocket status viewer
 
 ## Contributing
 

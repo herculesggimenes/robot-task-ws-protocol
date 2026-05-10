@@ -10,7 +10,6 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import websockets
-from websockets.server import WebSocketServerProtocol
 
 PROTOCOL = "robot-task-ws"
 VERSION = "0.1.0"
@@ -18,9 +17,10 @@ VERSION = "0.1.0"
 
 @dataclass
 class CoordinatorState:
-    clients: dict[WebSocketServerProtocol, dict[str, Any]] = field(default_factory=dict)
+    clients: dict[Any, dict[str, Any]] = field(default_factory=dict)
     pending_tasks: dict[str, dict[str, Any]] = field(default_factory=dict)
     claimed_tasks: dict[str, str] = field(default_factory=dict)
+    latest: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 state = CoordinatorState()
@@ -36,7 +36,7 @@ def envelope(message_type: str, **fields: Any) -> dict[str, Any]:
     }
 
 
-async def broadcast(message: dict[str, Any], *, exclude: WebSocketServerProtocol | None = None) -> None:
+async def broadcast(message: dict[str, Any], *, exclude: Any | None = None) -> None:
     if not state.clients:
         return
     payload = json.dumps(message)
@@ -46,7 +46,7 @@ async def broadcast(message: dict[str, Any], *, exclude: WebSocketServerProtocol
     )
 
 
-async def handle_message(ws: WebSocketServerProtocol, message: dict[str, Any]) -> None:
+async def handle_message(ws: Any, message: dict[str, Any]) -> None:
     message_type = message.get("type")
 
     if message.get("protocol") != PROTOCOL:
@@ -55,6 +55,7 @@ async def handle_message(ws: WebSocketServerProtocol, message: dict[str, Any]) -
 
     if message_type == "client.register":
         state.clients[ws] = message
+        await ws.send(json.dumps(snapshot()))
         for task in state.pending_tasks.values():
             await ws.send(json.dumps(task))
         return
@@ -90,7 +91,12 @@ async def handle_message(ws: WebSocketServerProtocol, message: dict[str, Any]) -
         await broadcast(message)
         return
 
-    if message_type in {"image.frame", "robot.state", "motor.command", "stop"}:
+    if message_type in {"image.frame", "robot.state", "leader.state", "status.report"}:
+        remember_latest(message)
+        await broadcast(message, exclude=ws)
+        return
+
+    if message_type in {"motor.command", "stop"}:
         await broadcast(message, exclude=ws)
         return
 
@@ -104,14 +110,59 @@ async def handle_message(ws: WebSocketServerProtocol, message: dict[str, Any]) -
     )
 
 
-async def handler(ws: WebSocketServerProtocol) -> None:
+def remember_latest(message: dict[str, Any]) -> None:
+    message_type = message["type"]
+    if message_type == "image.frame":
+        key = f"image.frame:{message.get('camera_id', 'unknown')}"
+    elif message_type == "robot.state":
+        key = f"robot.state:{message.get('robot_id', 'unknown')}"
+    elif message_type == "leader.state":
+        key = f"leader.state:{message.get('leader_id', 'unknown')}"
+    elif message_type == "status.report":
+        key = f"status.report:{message.get('component_id', 'unknown')}"
+    else:
+        key = message_type
+    state.latest[key] = message
+
+
+def snapshot() -> dict[str, Any]:
+    return envelope(
+        "status.report",
+        component_id="reference-coordinator",
+        role="coordinator",
+        status="ok",
+        details={
+            "clients": [
+                {
+                    "client_id": client.get("client_id"),
+                    "role": client.get("role"),
+                    "capabilities": client.get("capabilities", []),
+                }
+                for client in state.clients.values()
+                if client
+            ],
+            "pending_tasks": list(state.pending_tasks),
+            "claimed_tasks": state.claimed_tasks,
+            "latest": list(state.latest.values()),
+        },
+    )
+
+
+async def handler(ws: Any) -> None:
     state.clients[ws] = {}
     await ws.send(
         json.dumps(
             envelope(
                 "hello",
                 server_id="reference-coordinator",
-                capabilities=["task_queue", "image_frames", "motor_commands"],
+                capabilities=[
+                    "task_queue",
+                    "image_frames",
+                    "robot_state",
+                    "leader_state",
+                    "status_reports",
+                    "motor_commands",
+                ],
             )
         )
     )

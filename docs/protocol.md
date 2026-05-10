@@ -65,6 +65,7 @@ Common roles:
 - `operator`
 - `safety`
 - `monitor`
+- `leader`
 
 ### `image.frame`
 
@@ -97,6 +98,51 @@ Publishes the current robot state.
   "robot_id": "yam-1",
   "joint_pos": [0, 0, 0, 0, 0, 0, 0.3, 0, 0, 0, 0, 0, 0, 0.3],
   "state_space": "yam_bimanual_14d"
+}
+```
+
+### `leader.state`
+
+Publishes the live state of a leader arm or other teleoperation input device.
+This is separate from `robot.state` because leader devices may have different
+kinematics, joint counts, calibration state, buttons, or sync mode.
+
+```json
+{
+  "type": "leader.state",
+  "protocol": "robot-task-ws",
+  "version": "0.1.0",
+  "leader_id": "so100-right",
+  "kind": "so100",
+  "target_robot_id": "yam-1",
+  "target_arm": "right",
+  "raw": [2048, 2100, 1980, 1800, 2200, 1200],
+  "buttons": [0, 1],
+  "synchronized": true,
+  "executing": true,
+  "hz": 30.0
+}
+```
+
+### `status.report`
+
+Publishes component health for dashboards and monitors.
+
+```json
+{
+  "type": "status.report",
+  "protocol": "robot-task-ws",
+  "version": "0.1.0",
+  "component_id": "yam-control-adapter",
+  "role": "executor",
+  "status": "ok",
+  "details": {
+    "control_url": "ws://127.0.0.1:8780/control",
+    "arms": {
+      "left": {"connected": true},
+      "right": {"connected": true}
+    }
+  }
 }
 ```
 
@@ -192,6 +238,24 @@ Requests immediate stop. Any safety-aware client may emit it.
   "reason": "operator_requested"
 }
 ```
+
+### Legacy YAM Compatibility
+
+The existing hackathon YAM control socket uses JSON-RPC-style messages:
+
+```json
+{
+  "id": "cmd-1",
+  "method": "command_joint_pos",
+  "params": {
+    "joint_pos": [0, 0, 0, 0, 0, 0, 0.3, 0, 0, 0, 0, 0, 0, 0.3]
+  }
+}
+```
+
+During migration, adapters translate that endpoint to protocol-native
+`robot.state`, `status.report`, and `motor.command` messages. New components
+should prefer the protocol-native message types.
 
 ### `error`
 

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://robot-task-ws-protocol.dev/schemas/leader-state.schema.json",
+  "title": "LeaderState",
+  "type": "object",
+  "required": ["type", "protocol", "version", "leader_id", "kind"],
+  "additionalProperties": true,
+  "properties": {
+    "type": { "const": "leader.state" },
+    "protocol": { "const": "robot-task-ws" },
+    "version": { "type": "string" },
+    "leader_id": { "type": "string", "minLength": 1 },
+    "kind": { "type": "string", "minLength": 1 },
+    "target_robot_id": { "type": "string" },
+    "target_arm": { "enum": ["left", "right", "both"] },
+    "raw": {
+      "type": "array",
+      "items": { "type": "number" }
+    },
+    "joint_pos": {
+      "type": "array",
+      "items": { "type": "number" }
+    },
+    "buttons": {
+      "type": "array",
+      "items": { "type": "number" }
+    },
+    "synchronized": { "type": "boolean" },
+    "executing": { "type": "boolean" },
+    "hz": { "type": "number", "exclusiveMinimum": 0 }
+  }
+}

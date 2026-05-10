@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://robot-task-ws-protocol.dev/schemas/robot-state.schema.json",
+  "title": "RobotState",
+  "type": "object",
+  "required": ["type", "protocol", "version", "robot_id", "state_space"],
+  "additionalProperties": true,
+  "properties": {
+    "type": { "const": "robot.state" },
+    "protocol": { "const": "robot-task-ws" },
+    "version": { "type": "string" },
+    "robot_id": { "type": "string", "minLength": 1 },
+    "state_space": { "type": "string", "minLength": 1 },
+    "joint_pos": {
+      "type": "array",
+      "items": { "type": "number" }
+    },
+    "observations": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

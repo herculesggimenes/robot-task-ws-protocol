@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://robot-task-ws-protocol.dev/schemas/status-report.schema.json",
+  "title": "StatusReport",
+  "type": "object",
+  "required": ["type", "protocol", "version", "component_id", "role", "status"],
+  "additionalProperties": true,
+  "properties": {
+    "type": { "const": "status.report" },
+    "protocol": { "const": "robot-task-ws" },
+    "version": { "type": "string" },
+    "component_id": { "type": "string", "minLength": 1 },
+    "role": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["ok", "degraded", "error", "offline"] },
+    "details": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}
