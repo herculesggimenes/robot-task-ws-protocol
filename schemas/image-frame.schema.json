@@ -29,7 +29,18 @@
     "data": { "type": "string" },
     "depth": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": true,
+      "properties": {
+        "content_type": { "type": "string" },
+        "encoding": { "enum": ["base64"] },
+        "format": { "enum": ["uint16"] },
+        "byte_order": { "enum": ["little", "big"] },
+        "unit": { "type": "string" },
+        "scale_to_meters": { "type": "number" },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "data": { "type": "string" }
+      }
     }
   }
 }

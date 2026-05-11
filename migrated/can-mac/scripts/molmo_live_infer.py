@@ -11,7 +11,7 @@ Examples::
     --right-url 'http://127.0.0.1:8767/frame.jpg'
 
   # Top only (right/left sent as black frames matching top resolution)
-  uv run python scripts/molmo_live_infer.py --top-url "$YAM_CAMERA_URL"
+  uv run python scripts/molmo_live_infer.py --top-url \"\$YAM_CAMERA_URL\"
 """
 
 from __future__ import annotations

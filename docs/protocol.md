@@ -86,6 +86,33 @@ Future versions may add binary side-channel frame transfer.
 }
 ```
 
+Depth-capable feeds may include raw metric depth beside the JPEG preview:
+
+```json
+{
+  "type": "image.frame",
+  "protocol": "robot-task-ws",
+  "version": "0.1.0",
+  "frame_id": "depth-1778448000",
+  "camera_id": "depth",
+  "content_type": "image/jpeg",
+  "encoding": "base64",
+  "captured_at": 1778448000.0,
+  "data": "/9j/4AAQSkZJRgABAQAAAQABAAD...",
+  "depth": {
+    "content_type": "application/octet-stream",
+    "encoding": "base64",
+    "format": "uint16",
+    "byte_order": "little",
+    "unit": "meter",
+    "scale_to_meters": 0.001,
+    "width": 640,
+    "height": 400,
+    "data": "<base64 little-endian uint16>"
+  }
+}
+```
+
 ### `robot.state`
 
 Publishes the current robot state.

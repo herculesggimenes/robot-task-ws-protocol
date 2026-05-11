@@ -33,6 +33,21 @@ The compatibility adapter polls `get_status` and `get_joint_pos`, publishes
 protocol-native `status.report` and `robot.state`, and forwards
 `motor.command` messages back to `command_joint_pos`.
 
+The current YAM control server owns the bimanual bridge process and can start
+separate CAN bridge sockets for each arm. The default physical mapping is:
+
+```text
+left:can0,right:can1
+```
+
+Override only when the two USB/CAN ports are physically swapped:
+
+```bash
+uv run yamctl control-server \
+  --arm-specs left:can1,right:can0 \
+  --host 0.0.0.0
+```
+
 ```bash
 python examples/python/legacy_yam_control_adapter.py \
   --coordinator ws://127.0.0.1:8765 \
@@ -57,6 +72,21 @@ Known commands:
 
 The compatibility adapter subscribes to legacy frames and republishes each
 frame as `image.frame`.
+
+Current YAM lab command for the four-feed setup:
+
+```bash
+sudo /opt/homebrew/bin/uv run python migrated/can-mac/scripts/multi_camera_ws_server.py \
+  --host 0.0.0.0 \
+  --port 8770 \
+  --camera-specs 'right:1,left:2,top:orbbec:color,depth:orbbec:depth' \
+  --quality 80
+```
+
+The `right` and `left` feeds are OpenCV/AVFoundation cameras. The `top` and
+`depth` feeds are logical Orbbec SDK feeds from one physical camera. Use
+`reset_camera` to recover stuck feeds; OpenCV feeds reset independently and
+Orbbec logical feeds restart the shared Orbbec SDK worker.
 
 ```bash
 python examples/python/legacy_camera_adapter.py \

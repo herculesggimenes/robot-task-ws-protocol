@@ -10,6 +10,7 @@ import os
 import signal
 import subprocess
 import time
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +30,7 @@ DEFAULT_CONTROL_URL = "wss://2d37-12-125-194-54.ngrok-free.app/control"
 DEFAULT_CAMERA_URL = "ws://127.0.0.1:8770/cameras"
 DEFAULT_LEADER_PORT = "/dev/cu.usbmodem5B140318401"
 LOG_PATH = ROOT / "logs" / "leader_switchboard_bridge.log"
+LEADER_STATUS_PATH = ROOT / "logs" / "leader_axes.json"
 
 
 class TeleopStart(BaseModel):
@@ -36,15 +38,18 @@ class TeleopStart(BaseModel):
     control_url: str = DEFAULT_CONTROL_URL
     leader_port: str = DEFAULT_LEADER_PORT
     kind: str = "so100"
+    joint_map: str = "0,1,2,3,4"
     joint_signs: str = "-1,-1,-1,-1,-1"
     sixth_joint_source: str = "gripper"
     sixth_joint_sign: float = -1.0
     lock_joints: str = ""
-    hz: float = 60.0
-    max_step: float = 0.015
-    max_gripper_step: float = 0.01
-    max_joint_delta: float = 0.25
+    hz: float = 40.0
+    max_step: float = 0.006
+    max_gripper_step: float = 0.005
+    max_joint_delta: float = 0.15
     sync_samples: int = 5
+    fire_and_forget: bool = True
+    max_in_flight: int = 3
 
 
 class ZeroGravityRequest(BaseModel):
@@ -87,6 +92,7 @@ class Runtime:
 
 
 runtime = Runtime()
+runtime_lock = threading.Lock()
 
 
 def _detect_leader_port() -> str:
@@ -138,68 +144,84 @@ def create_app(camera_url: str) -> FastAPI:
         if config.sixth_joint_source not in {"none", "gripper", "wrist_roll"}:
             raise HTTPException(status_code=400, detail="invalid sixth_joint_source")
 
-        runtime.stop()
-        if config.leader_port == DEFAULT_LEADER_PORT and not Path(config.leader_port).exists():
-            config.leader_port = _detect_leader_port()
-        cmd = [
-            str(LEROBOT / ".venv" / "bin" / "python"),
-            str(LEADER_BRIDGE),
-            "--control-url",
-            config.control_url,
-            "--port",
-            config.leader_port,
-            "--kind",
-            config.kind,
-            "--arm",
-            config.arm,
-            "--hz",
-            str(config.hz),
-            "--max-step",
-            str(config.max_step),
-            "--max-gripper-step",
-            str(config.max_gripper_step),
-            "--max-joint-delta",
-            str(config.max_joint_delta),
-            f"--joint-signs={config.joint_signs}",
-            "--sixth-joint-source",
-            config.sixth_joint_source,
-            "--sixth-joint-sign",
-            str(config.sixth_joint_sign),
-            "--lock-joints",
-            config.lock_joints,
-            "--sync-samples",
-            str(config.sync_samples),
-            "--fire-and-forget",
-            "--execute",
-        ]
-        env = os.environ.copy()
-        env["PYTHONPATH"] = "src"
-        LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        log = LOG_PATH.open("a")
-        log.write(f"\n--- {time.strftime('%Y-%m-%d %H:%M:%S')} starting {' '.join(cmd)} ---\n")
-        log.flush()
-        proc = subprocess.Popen(
-            cmd,
-            cwd=LEROBOT,
-            env=env,
-            text=True,
-            stdout=log,
-            stderr=log,
-            start_new_session=True,
-        )
-        runtime.proc = proc
-        runtime.started_at = time.time()
-        runtime.config = config.model_dump()
-        time.sleep(0.4)
-        if proc.poll() is not None:
+        with runtime_lock:
             runtime.stop()
-            raise HTTPException(status_code=500, detail="leader bridge exited during startup")
-        return runtime.status()
+            time.sleep(0.25)
+            if config.leader_port == DEFAULT_LEADER_PORT and not Path(config.leader_port).exists():
+                config.leader_port = _detect_leader_port()
+            cmd = [
+                str(LEROBOT / ".venv" / "bin" / "python"),
+                str(LEADER_BRIDGE),
+                "--control-url",
+                config.control_url,
+                "--port",
+                config.leader_port,
+                "--kind",
+                config.kind,
+                "--arm",
+                config.arm,
+                "--joint-map",
+                config.joint_map,
+                "--hz",
+                str(config.hz),
+                "--max-step",
+                str(config.max_step),
+                "--max-gripper-step",
+                str(config.max_gripper_step),
+                "--max-joint-delta",
+                str(config.max_joint_delta),
+                f"--joint-signs={config.joint_signs}",
+                "--sixth-joint-source",
+                config.sixth_joint_source,
+                "--sixth-joint-sign",
+                str(config.sixth_joint_sign),
+                "--lock-joints",
+                config.lock_joints,
+                "--sync-samples",
+                str(config.sync_samples),
+                "--max-in-flight",
+                str(config.max_in_flight),
+                "--status-path",
+                str(LEADER_STATUS_PATH),
+                "--execute",
+            ]
+            if config.fire_and_forget:
+                cmd.insert(-1, "--fire-and-forget")
+            env = os.environ.copy()
+            env["PYTHONPATH"] = "src"
+            LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            log = LOG_PATH.open("a")
+            log.write(f"\n--- {time.strftime('%Y-%m-%d %H:%M:%S')} starting {' '.join(cmd)} ---\n")
+            log.flush()
+            proc = subprocess.Popen(
+                cmd,
+                cwd=LEROBOT,
+                env=env,
+                text=True,
+                stdout=log,
+                stderr=log,
+                start_new_session=True,
+            )
+            runtime.proc = proc
+            runtime.started_at = time.time()
+            runtime.config = config.model_dump()
+            time.sleep(1.2)
+            if proc.poll() is not None:
+                runtime.stop()
+                detail = "leader bridge exited during startup"
+                try:
+                    tail = LOG_PATH.read_text(errors="replace").splitlines()[-25:]
+                    detail = detail + "\n" + "\n".join(tail)
+                except Exception:
+                    pass
+                raise HTTPException(status_code=500, detail=detail)
+            return runtime.status()
 
     @app.post("/api/teleop/stop")
     def teleop_stop() -> dict[str, Any]:
-        runtime.stop()
-        return runtime.status()
+        with runtime_lock:
+            runtime.stop()
+            return runtime.status()
 
     @app.get("/api/robot/status")
     async def robot_status(control_url: str = DEFAULT_CONTROL_URL) -> dict[str, Any]:
@@ -207,6 +229,15 @@ def create_app(camera_url: str) -> FastAPI:
             return await asyncio.to_thread(_robot_rpc, control_url, "get_status", {})
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.get("/api/leader/axes")
+    def leader_axes() -> dict[str, Any]:
+        try:
+            return json.loads(LEADER_STATUS_PATH.read_text())
+        except FileNotFoundError:
+            return {"error": "leader axis status is not available yet"}
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     @app.get("/api/robot/joints")
     async def robot_joints(control_url: str = DEFAULT_CONTROL_URL) -> list[float]:
@@ -289,12 +320,18 @@ INDEX_HTML = r"""<!doctype html>
         <label>Leader port</label>
         <input id="leaderPort">
         <div class="row">
+          <div><label>Joint map</label><input id="jointMap" value="0,1,2,3,4"></div>
           <div><label>Joint signs</label><input id="jointSigns" value="-1,-1,-1,-1,-1"></div>
+        </div>
+        <div class="row">
           <div><label>Sixth source</label><select id="sixthSource"><option>gripper</option><option>wrist_roll</option><option>none</option></select></div>
         </div>
         <div class="row">
-          <div><label>Hz</label><input id="hz" type="number" min="1" max="120" step="1" value="60"></div>
-          <div><label>Max step</label><input id="maxStep" type="number" min="0.001" max="0.1" step="0.001" value="0.015"></div>
+          <div><label>Hz</label><input id="hz" type="number" min="1" max="120" step="1" value="40"></div>
+          <div><label>Max step</label><input id="maxStep" type="number" min="0.001" max="0.1" step="0.001" value="0.006"></div>
+        </div>
+        <div class="locks" style="grid-template-columns:1fr">
+          <label><input id="fireForget" type="checkbox" checked> Responsive bounded sends</label>
         </div>
         <label>Lock YAM arm joints</label>
         <div class="locks" id="locks"></div>
@@ -310,6 +347,10 @@ INDEX_HTML = r"""<!doctype html>
       <section style="margin-top:14px">
         <h2>Status</h2>
         <div id="status" class="status"></div>
+      </section>
+      <section style="margin-top:14px">
+        <h2>Leader Axes</h2>
+        <div id="axes" class="status"></div>
       </section>
     </div>
     <section>
@@ -347,19 +388,27 @@ function lockJoints() {
   return [...document.querySelectorAll("#locks input:checked")].map(i => i.value).join(",");
 }
 $("startBtn").onclick = async () => {
+  $("startBtn").disabled = true;
   const payload = {
     arm: activeArm,
     control_url: $("controlUrl").value,
     leader_port: $("leaderPort").value,
+    joint_map: $("jointMap").value,
     joint_signs: $("jointSigns").value,
     sixth_joint_source: $("sixthSource").value,
     lock_joints: lockJoints(),
-    hz: Number($("hz").value || 60),
-    max_step: Number($("maxStep").value || 0.015)
+    hz: Number($("hz").value || 40),
+    max_step: Number($("maxStep").value || 0.006),
+    fire_and_forget: $("fireForget").checked,
+    max_in_flight: 3
   };
-  const res = await fetch("/api/teleop/start", {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(payload)});
-  if (!res.ok) alert(await res.text());
-  await refresh();
+  try {
+    const res = await fetch("/api/teleop/start", {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(payload)});
+    if (!res.ok) alert(await res.text());
+    await refresh();
+  } finally {
+    $("startBtn").disabled = false;
+  }
 };
 $("stopBtn").onclick = async () => { await fetch("/api/teleop/stop", {method:"POST"}); await refresh(); };
 $("zeroOnBtn").onclick = () => setZeroGravity(true);
@@ -374,19 +423,30 @@ async function setZeroGravity(enabled) {
   await refresh();
 }
 async function refresh() {
-  const [teleop, robot] = await Promise.all([
+  const [teleop, robot, axes] = await Promise.all([
     fetch("/api/teleop/status").then(r => r.json()),
-    fetch(`/api/robot/status?control_url=${encodeURIComponent($("controlUrl").value)}`).then(r => r.json()).catch(e => ({error:String(e)}))
+    fetch(`/api/robot/status?control_url=${encodeURIComponent($("controlUrl").value)}`).then(r => r.json()).catch(e => ({error:String(e)})),
+    fetch("/api/leader/axes").then(r => r.json()).catch(e => ({error:String(e)}))
   ]);
   $("live").textContent = teleop.running ? `teleop ${teleop.config.arm}` : "teleop stopped";
   $("live").classList.toggle("live", !!teleop.running);
   $("status").textContent = JSON.stringify({teleop, robot}, null, 2);
+  $("axes").textContent = formatAxes(axes);
+}
+function formatAxes(axes) {
+  if (axes.error || !axes.motors) return JSON.stringify(axes, null, 2);
+  return axes.motors.map((name, i) => {
+    const raw = Number(axes.raw[i]).toFixed(0).padStart(5, " ");
+    const delta = Number(axes.delta_raw[i]).toFixed(0).padStart(5, " ");
+    const mapped = i < axes.joint_map.length ? ` -> J${axes.joint_map[i]}` : "";
+    return `${i}: ${name.padEnd(13)} raw=${raw} delta=${delta}${mapped}`;
+  }).join("\n");
 }
 function connectCamera() {
   if (cameraWs) cameraWs.close();
   const url = $("cameraUrl").value;
   cameraWs = new WebSocket(url);
-  cameraWs.onopen = () => cameraWs.send(JSON.stringify({type:"subscribe", fps:3, cameras:"all", bundle:true}));
+  cameraWs.onopen = () => cameraWs.send(JSON.stringify({type:"subscribe", fps:6, cameras:"all", bundle:true}));
   cameraWs.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
     if (msg.type === "hello" && Array.isArray(msg.cameras)) {
@@ -422,7 +482,7 @@ function ensureCam(cameraId, message) {
   return node;
 }
 $("cameraUrl").addEventListener("change", connectCamera);
-setInterval(refresh, 2000);
+setInterval(refresh, 1000);
 init();
 </script>
 </body>
